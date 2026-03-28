@@ -4,7 +4,10 @@ import { testResume } from './TestResume.js'
 
 const emit = defineEmits(['parsed'])
 const isDragging = ref(false)
+const isLoading = ref(false)
+const error = ref('')
 const fileInput = ref(null)
+const pasteContent = ref('')
 
 const handleDrop = async (e) => {
   e.preventDefault()
@@ -19,86 +22,41 @@ const handleFileSelect = async (e) => {
 }
 
 const parseFile = async (file) => {
-  const extension = file.name.split('.').pop().toLowerCase()
+  error.value = ''
+  isLoading.value = true
 
-  if (extension === 'pdf') {
-    await parsePDF(file)
-  } else if (extension === 'docx' || extension === 'doc') {
-    await parseDocx(file)
-  } else if (extension === 'txt') {
-    await parseTxt(file)
-  } else {
-    alert('不支持的文件格式，请上传 PDF、Word 或 TXT 文件')
-  }
-}
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
 
-const parsePDF = async (file) => {
-  // 使用 PDF.js 解析 PDF
-  const reader = new FileReader()
-  reader.onload = async (e) => {
-    try {
-      const typedArray = new Uint8Array(e.target.result)
+    const response = await fetch('http://localhost:9001/api/parse', {
+      method: 'POST',
+      body: formData
+    })
 
-      // 动态加载 PDF.js
-      if (!window.pdfjsLib) {
-        const script = document.createElement('script')
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
-        script.onload = async () => {
-          window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
-          const pdf = await window.pdfjsLib.getDocument(typedArray).promise
-          let text = ''
-          for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i)
-            const content = await page.getTextContent()
-            text += content.items.map(item => item.str).join(' ') + '\n'
-          }
-          emit('parsed', text)
-        }
-        document.head.appendChild(script)
-      } else {
-        const pdf = await window.pdfjsLib.getDocument(typedArray).promise
-        let text = ''
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i)
-          const content = await page.getTextContent()
-          text += content.items.map(item => item.str).join(' ') + '\n'
-        }
-        emit('parsed', text)
-      }
-    } catch (error) {
-      console.error('PDF 解析失败:', error)
-      alert('PDF 解析失败，请尝试复制文本粘贴')
+    if (!response.ok) {
+      throw new Error('文件解析失败')
     }
-  }
-  reader.readAsArrayBuffer(file)
-}
 
-const parseDocx = async (file) => {
-  // 使用 mammoth.js 解析 docx
-  const script = document.createElement('script')
-  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js'
-  script.onload = async () => {
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      try {
-        const result = await window.mammoth.extractRawText({ arrayBuffer: e.target.result })
-        emit('parsed', result.value)
-      } catch (error) {
-        console.error('Word 解析失败:', error)
-        alert('Word 文档解析失败')
-      }
+    const result = await response.json()
+
+    if (result.success) {
+      emit('parsed', result.content)
+    } else {
+      throw new Error(result.error || '解析失败')
     }
-    reader.readAsArrayBuffer(file)
+  } catch (err) {
+    console.error('解析失败:', err)
+    error.value = '解析失败，请确保后端服务已启动，或尝试复制文本粘贴'
+  } finally {
+    isLoading.value = false
   }
-  document.head.appendChild(script)
 }
 
-const parseTxt = (file) => {
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    emit('parsed', e.target.result)
+const handlePasteSubmit = () => {
+  if (pasteContent.value.trim()) {
+    emit('parsed', pasteContent.value)
   }
-  reader.readAsText(file)
 }
 
 const useTestResume = () => {
@@ -114,14 +72,14 @@ const useTestResume = () => {
     <!-- 上传区域 -->
     <div
       class="upload-area"
-      :class="{ dragging: isDragging }"
+      :class="{ dragging: isDragging, loading: isLoading }"
       @dragover.prevent="isDragging = true"
       @dragleave="isDragging = false"
       @drop="handleDrop"
-      @click="fileInput.click()"
+      @click="!isLoading && fileInput.click()"
     >
-      <div class="upload-icon">📄</div>
-      <p class="upload-text">拖拽文件到此处，或点击选择文件</p>
+      <div class="upload-icon">{{ isLoading ? '⏳' : '📄' }}</div>
+      <p class="upload-text">{{ isLoading ? '解析中...' : '拖拽文件到此处，或点击选择文件' }}</p>
       <p class="upload-hint">文件大小不超过 10MB</p>
       <input
         ref="fileInput"
@@ -129,8 +87,11 @@ const useTestResume = () => {
         accept=".pdf,.docx,.doc,.txt"
         @change="handleFileSelect"
         hidden
+        :disabled="isLoading"
       />
     </div>
+
+    <div v-if="error" class="error">{{ error }}</div>
 
     <!-- 或者粘贴文本 -->
     <div class="divider">
@@ -138,12 +99,12 @@ const useTestResume = () => {
     </div>
 
     <textarea
+      v-model="pasteContent"
       class="paste-area"
       placeholder="粘贴您的简历内容..."
-      @keydown.ctrl.v.prevent="true"
     ></textarea>
 
-    <button class="btn btn-primary" @click="emit('parsed', document.querySelector('.paste-area').value)">
+    <button class="btn btn-primary" @click="handlePasteSubmit">
       继续
     </button>
 
@@ -186,10 +147,15 @@ const useTestResume = () => {
   background: #fafafa;
 }
 
-.upload-area:hover,
+.upload-area:hover:not(.loading),
 .upload-area.dragging {
   border-color: #2563eb;
   background: #eff6ff;
+}
+
+.upload-area.loading {
+  cursor: wait;
+  opacity: 0.7;
 }
 
 .upload-icon {
@@ -206,6 +172,16 @@ const useTestResume = () => {
 .upload-hint {
   font-size: 14px;
   color: #999;
+}
+
+.error {
+  color: #ef4444;
+  text-align: center;
+  margin: 16px 0;
+  padding: 12px;
+  background: #fef2f2;
+  border-radius: 8px;
+  font-size: 14px;
 }
 
 .divider {

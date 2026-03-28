@@ -6,7 +6,13 @@ const props = defineProps({
   resumeContent: String
 })
 
+const emit = defineEmits(['reset'])
+
 const activeSection = ref('score')
+
+const goBack = () => {
+  emit('reset')
+}
 
 const getScoreColor = (score) => {
   if (score >= 80) return '#10b981'
@@ -156,7 +162,7 @@ const exportPDF = () => {
 
     <!-- 操作按钮 -->
     <div class="actions">
-      <button class="btn btn-outline" onclick="window.history.back()">
+      <button class="btn btn-outline" @click="goBack">
         重新编辑
       </button>
       <button class="btn btn-primary" @click="exportPDF">

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -X POST http://localhost:9000/api/analyze -H \"Content-Type: application/json\" -d '{\"\"resumeText\"\":\"\"张三\\\\n电话: 13800138000\\\\n工作经历: 5年前端开发\\\\n技能: JavaScript Vue React\"\",\"\"jobDescription\"\":\"\"\"\"}')",
+      "Bash(mvn package:*)"
+    ]
+  }
+}

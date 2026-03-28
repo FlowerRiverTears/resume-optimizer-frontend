@@ -18,6 +18,11 @@ const handleAnalysisComplete = (result) => {
   analysisResult.value = result
   activeTab.value = 'result'
 }
+
+const handleReset = () => {
+  analysisResult.value = null
+  activeTab.value = 'editor'
+}
 </script>
 
 <template>
@@ -72,6 +77,7 @@ const handleAnalysisComplete = (result) => {
           v-if="activeTab === 'result'"
           :result="analysisResult"
           :resume-content="resumeContent"
+          @reset="handleReset"
         />
       </div>
     </main>
