@@ -78,6 +78,4 @@ src/
     └── TemplateComparison.vue  # 模板对比组件
 ```
 
-## License
 
-MIT License
