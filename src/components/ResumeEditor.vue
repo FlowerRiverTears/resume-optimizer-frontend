@@ -62,7 +62,11 @@ const handleAnalyze = async () => {
         hasEducation: false,
         hasSkills: true,
         totalWords: 0
-      }
+      },
+      // 新增字段
+      categoryScores: result.categoryScores || {},
+      skillGaps: result.skillGaps || [],
+      optimizationTips: result.optimizationTips || []
     }
 
     emit('analyze', formattedResult)
@@ -94,7 +98,7 @@ const handleAnalyze = async () => {
         v-model="localJobDesc"
         class="textarea"
         placeholder="粘贴目标职位描述，系统将分析简历与职位的匹配度..."
-        @input="emit('update:jobDescription', localJobDesc)"
+        @blur="emit('update:jobDescription', localJobDesc)"
       ></textarea>
     </div>
 

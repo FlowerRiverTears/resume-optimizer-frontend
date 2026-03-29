@@ -3,24 +3,64 @@ import { ref } from 'vue'
 import ResumeUploader from './components/ResumeUploader.vue'
 import ResumeEditor from './components/ResumeEditor.vue'
 import AnalysisResult from './components/AnalysisResult.vue'
+import TemplateComparison from './components/TemplateComparison.vue'
 
 const resumeContent = ref('')
 const jobDescription = ref('')
 const analysisResult = ref(null)
 const activeTab = ref('upload')
+const showComparison = ref(false)
+const optimizedResume = ref('')
 
 const handleResumeParsed = (content) => {
   resumeContent.value = content
   activeTab.value = 'editor'
 }
 
-const handleAnalysisComplete = (result) => {
+const handleAnalysisComplete = async (result) => {
   analysisResult.value = result
   activeTab.value = 'result'
+
+  // 获取优化版简历
+  try {
+    const response = await fetch('http://localhost:9001/api/optimize', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        resumeText: resumeContent.value,
+        matchedSkills: result.foundKeywords || [],
+        missingSkills: result.missingKeywords || [],
+        skillGaps: result.skillGaps || []
+      })
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      optimizedResume.value = data.optimizedResume || ''
+    }
+  } catch (err) {
+    console.error('获取优化简历失败:', err)
+  }
 }
 
 const handleReset = () => {
   analysisResult.value = null
+  activeTab.value = 'editor'
+}
+
+const openComparison = () => {
+  showComparison.value = true
+}
+
+const closeComparison = () => {
+  showComparison.value = false
+}
+
+const useOptimizedTemplate = (template) => {
+  resumeContent.value = template
+  showComparison.value = false
   activeTab.value = 'editor'
 }
 </script>
@@ -78,6 +118,18 @@ const handleReset = () => {
           :result="analysisResult"
           :resume-content="resumeContent"
           @reset="handleReset"
+          @compare="openComparison"
+        />
+
+        <!-- 模板对比弹窗 -->
+        <TemplateComparison
+          v-if="showComparison"
+          :original-resume="resumeContent"
+          :optimized-resume="optimizedResume"
+          :matched-skills="analysisResult?.foundKeywords || []"
+          :missing-skills="analysisResult?.missingKeywords || []"
+          @close="closeComparison"
+          @use-template="useOptimizedTemplate"
         />
       </div>
     </main>
