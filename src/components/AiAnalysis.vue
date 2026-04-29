@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { API, apiPost, apiGet } from '../api.js'
+import { API, apiPost, apiGet, renderMarkdown } from '../api.js'
 
 const props = defineProps({
   resumeContent: String,
@@ -125,7 +125,7 @@ onMounted(() => {
         <div v-if="showThinking" class="thinking-content">{{ aiResult.thinking }}</div>
       </div>
 
-      <div class="result-content" v-html="aiResult.answer.replace(/\n/g, '<br/>')"></div>
+      <div class="result-content" v-html="renderMarkdown(aiResult.answer)"></div>
 
       <div v-if="aiResult.searchResults && aiResult.searchResults.length" class="rag-results">
         <h4>📎 RAG 检索结果</h4>
@@ -356,6 +356,19 @@ onMounted(() => {
   line-height: 1.8;
   color: #334155;
 }
+
+.result-content :deep(h1) { font-size: 22px; font-weight: 700; margin: 16px 0 10px; color: #1e293b; }
+.result-content :deep(h2) { font-size: 19px; font-weight: 700; margin: 14px 0 8px; color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 4px; }
+.result-content :deep(h3) { font-size: 17px; font-weight: 600; margin: 12px 0 6px; color: #334155; }
+.result-content :deep(h4) { font-size: 15px; font-weight: 600; margin: 10px 0 4px; color: #475569; }
+.result-content :deep(table) { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 14px; }
+.result-content :deep(td) { border: 1px solid #e2e8f0; padding: 8px 12px; }
+.result-content :deep(tr:nth-child(odd)) { background: #f1f5f9; }
+.result-content :deep(ul) { padding-left: 24px; margin: 8px 0; }
+.result-content :deep(li) { margin: 4px 0; }
+.result-content :deep(hr) { border: none; border-top: 1px solid #e2e8f0; margin: 16px 0; }
+.result-content :deep(strong) { color: #1e293b; }
+.result-content :deep(blockquote) { border-left: 3px solid #7c3aed; padding-left: 14px; color: #64748b; margin: 10px 0; }
 
 .rag-results {
   margin-top: 24px;

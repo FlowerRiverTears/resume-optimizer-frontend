@@ -83,3 +83,56 @@ export async function apiUpload(url, formData) {
   
   return response.json()
 }
+
+export function renderMarkdown(text) {
+  if (!text) return ''
+  
+  let html = text
+
+  html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>')
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>')
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>')
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>')
+
+  html = html.replace(/^---$/gm, '<hr>')
+
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>')
+
+  html = html.replace(/^- (.+)$/gm, '<li>$1</li>')
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
+
+  html = html.replace(/^\|(.+)\|$/gm, (match) => {
+    const cells = match.split('|').filter(c => c.trim() !== '')
+    if (cells.every(c => /^[\s:-]+$/.test(c))) return ''
+    const isHeader = cells.every(c => /^[\s:-]+$/.test(c.trim()))
+    if (isHeader) return ''
+    const row = cells.map(c => `<td>${c.trim()}</td>`).join('')
+    return `<tr>${row}</tr>`
+  })
+  html = html.replace(/(<tr>.*<\/tr>\n?)+/g, '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%">$&</table>')
+
+  html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
+  html = html.replace(/(<blockquote>.*<\/blockquote>\n?)+/g, '<div class="quote">$&</div>')
+
+  html = html.replace(/✅/g, '<span style="color:#16a34a">✅</span>')
+  html = html.replace(/🎯/g, '<span style="color:#2563eb">🎯</span>')
+  html = html.replace(/📌/g, '<span style="color:#dc2626">📌</span>')
+
+  html = html.replace(/\n\n/g, '</p><p>')
+  html = html.replace(/\n/g, '<br>')
+  html = '<p>' + html + '</p>'
+
+  html = html.replace(/<p><\/p>/g, '')
+  html = html.replace(/<p>(<h[1-4]>)/g, '$1')
+  html = html.replace(/(<\/h[1-4]>)<\/p>/g, '$1')
+  html = html.replace(/<p>(<hr>)<\/p>/g, '$1')
+  html = html.replace(/<p>(<ul>)/g, '$1')
+  html = html.replace(/(<\/ul>)<\/p>/g, '$1')
+  html = html.replace(/<p>(<table)/g, '$1')
+  html = html.replace(/(<\/table>)<\/p>/g, '$1')
+  html = html.replace(/<p>(<div class="quote">)/g, '$1')
+  html = html.replace(/(<\/div>)<\/p>/g, '$1')
+
+  return html
+}

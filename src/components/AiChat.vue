@@ -1,6 +1,6 @@
 <script setup>
 import { ref, nextTick, onMounted } from 'vue'
-import { API, apiPost, apiGet } from '../api.js'
+import { API, apiPost, apiGet, renderMarkdown } from '../api.js'
 
 const props = defineProps({
   keyId: String,
@@ -176,7 +176,7 @@ onMounted(() => {
             </div>
           </div>
 
-          <div class="message-content" v-html="msg.content.replace(/\n/g, '<br/>')"></div>
+          <div class="message-content" v-html="renderMarkdown(msg.content)"></div>
 
           <div v-if="msg.searchResults && msg.searchResults.length" class="search-results">
             <div class="results-header">📎 RAG 检索到 {{ msg.searchResults.length }} 条相关数据</div>
@@ -392,6 +392,19 @@ onMounted(() => {
   background: #f1f5f9;
   border-bottom-left-radius: 4px;
 }
+
+.message-content :deep(h1) { font-size: 20px; font-weight: 700; margin: 12px 0 8px; color: #1e293b; }
+.message-content :deep(h2) { font-size: 18px; font-weight: 700; margin: 12px 0 8px; color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 4px; }
+.message-content :deep(h3) { font-size: 16px; font-weight: 600; margin: 10px 0 6px; color: #334155; }
+.message-content :deep(h4) { font-size: 14px; font-weight: 600; margin: 8px 0 4px; color: #475569; }
+.message-content :deep(table) { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+.message-content :deep(td) { border: 1px solid #e2e8f0; padding: 6px 10px; }
+.message-content :deep(tr:nth-child(odd)) { background: #f8fafc; }
+.message-content :deep(ul) { padding-left: 20px; margin: 6px 0; }
+.message-content :deep(li) { margin: 3px 0; }
+.message-content :deep(hr) { border: none; border-top: 1px solid #e2e8f0; margin: 12px 0; }
+.message-content :deep(strong) { color: #1e293b; }
+.message-content :deep(blockquote) { border-left: 3px solid #2563eb; padding-left: 12px; color: #64748b; margin: 8px 0; }
 
 .message.error .message-content {
   background: #fef2f2;
