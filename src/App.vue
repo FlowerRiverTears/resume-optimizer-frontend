@@ -4,6 +4,10 @@ import ResumeUploader from './components/ResumeUploader.vue'
 import ResumeEditor from './components/ResumeEditor.vue'
 import AnalysisResult from './components/AnalysisResult.vue'
 import TemplateComparison from './components/TemplateComparison.vue'
+import ApiKeyInput from './components/ApiKeyInput.vue'
+import AiChat from './components/AiChat.vue'
+import AiAnalysis from './components/AiAnalysis.vue'
+import { API, apiPost } from './api.js'
 
 const resumeContent = ref('')
 const jobDescription = ref('')
@@ -11,6 +15,9 @@ const analysisResult = ref(null)
 const activeTab = ref('upload')
 const showComparison = ref(false)
 const optimizedResume = ref('')
+const activeKeyId = ref('')
+const showAiAnalysis = ref(false)
+const aiAnalysisResult = ref(null)
 
 const handleResumeParsed = (content) => {
   resumeContent.value = content
@@ -21,25 +28,15 @@ const handleAnalysisComplete = async (result) => {
   analysisResult.value = result
   activeTab.value = 'result'
 
-  // 获取优化版简历
   try {
-    const response = await fetch('http://localhost:9001/api/optimize', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        resumeText: resumeContent.value,
-        matchedSkills: result.foundKeywords || [],
-        missingSkills: result.missingKeywords || [],
-        skillGaps: result.skillGaps || []
-      })
+    const data = await apiPost(API.optimize, {
+      resumeText: resumeContent.value,
+      matchedSkills: result.foundKeywords || [],
+      missingSkills: result.missingKeywords || [],
+      skillGaps: result.skillGaps || []
     })
 
-    if (response.ok) {
-      const data = await response.json()
-      optimizedResume.value = data.optimizedResume || ''
-    }
+    optimizedResume.value = data.optimizedResume || ''
   } catch (err) {
     console.error('获取优化简历失败:', err)
   }
@@ -63,18 +60,33 @@ const useOptimizedTemplate = (template) => {
   showComparison.value = false
   activeTab.value = 'editor'
 }
+
+const handleKeyValidated = (result) => {
+  activeKeyId.value = result.keyId
+}
+
+const handleKeyRemoved = () => {
+  activeKeyId.value = ''
+}
+
+const handleAiAnalysisDone = (result) => {
+  aiAnalysisResult.value = result
+}
 </script>
 
 <template>
   <div class="app">
-    <!-- 顶部导航 -->
     <header class="header">
       <h1 class="logo">简历优化器</h1>
+      <span class="logo-ai">AI Powered</span>
     </header>
 
-    <!-- 主内容 -->
     <main class="main">
-      <!-- Tab 导航 -->
+      <ApiKeyInput
+        @key-validated="handleKeyValidated"
+        @key-removed="handleKeyRemoved"
+      />
+
       <nav class="tabs">
         <button
           :class="['tab', { active: activeTab === 'upload' }]"
@@ -96,9 +108,14 @@ const useOptimizedTemplate = (template) => {
         >
           3. 分析结果
         </button>
+        <button
+          :class="['tab', { active: activeTab === 'ai' }]"
+          @click="activeTab = 'ai'"
+        >
+          🤖 AI 助手
+        </button>
       </nav>
 
-      <!-- Tab 内容 -->
       <div class="tab-content">
         <ResumeUploader
           v-if="activeTab === 'upload'"
@@ -113,15 +130,41 @@ const useOptimizedTemplate = (template) => {
           @update:job-description="jobDescription = $event"
         />
 
-        <AnalysisResult
-          v-if="activeTab === 'result'"
-          :result="analysisResult"
+        <div v-if="activeTab === 'result'">
+          <AnalysisResult
+            :result="analysisResult"
+            :resume-content="resumeContent"
+            @reset="handleReset"
+            @compare="openComparison"
+          />
+
+          <div style="margin-top: 24px;">
+            <button
+              class="btn-ai-analysis"
+              @click="showAiAnalysis = !showAiAnalysis"
+            >
+              🧠 {{ showAiAnalysis ? '收起 AI 深度分析' : '展开 AI 深度分析' }}
+            </button>
+
+            <AiAnalysis
+              v-if="showAiAnalysis"
+              :resume-content="resumeContent"
+              :job-description="jobDescription"
+              :analysis-result="analysisResult"
+              :key-id="activeKeyId"
+              @close="showAiAnalysis = false"
+              @analysis-done="handleAiAnalysisDone"
+            />
+          </div>
+        </div>
+
+        <AiChat
+          v-if="activeTab === 'ai'"
+          :key-id="activeKeyId"
           :resume-content="resumeContent"
-          @reset="handleReset"
-          @compare="openComparison"
+          :job-description="jobDescription"
         />
 
-        <!-- 模板对比弹窗 -->
         <TemplateComparison
           v-if="showComparison"
           :original-resume="resumeContent"
@@ -134,9 +177,8 @@ const useOptimizedTemplate = (template) => {
       </div>
     </main>
 
-    <!-- 页脚 -->
     <footer class="footer">
-      <p>简历优化器 - 开源免费 | 数据仅本地处理，保护隐私</p>
+      <p>简历优化器 - AI Powered | 数据仅本地处理，保护隐私</p>
     </footer>
   </div>
 </template>
@@ -161,11 +203,13 @@ body {
   flex-direction: column;
 }
 
-/* 头部 */
 .header {
   background: #fff;
   padding: 20px 40px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .logo {
@@ -174,7 +218,15 @@ body {
   color: #333;
 }
 
-/* 主内容 */
+.logo-ai {
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .main {
   flex: 1;
   max-width: 1000px;
@@ -183,7 +235,6 @@ body {
   width: 100%;
 }
 
-/* Tab 导航 */
 .tabs {
   display: flex;
   gap: 8px;
@@ -220,7 +271,6 @@ body {
   cursor: not-allowed;
 }
 
-/* Tab 内容 */
 .tab-content {
   background: #fff;
   border-radius: 12px;
@@ -228,7 +278,24 @@ body {
   min-height: 500px;
 }
 
-/* 页脚 */
+.btn-ai-analysis {
+  display: block;
+  width: 100%;
+  padding: 14px 24px;
+  border: 2px solid #7c3aed;
+  background: #fff;
+  color: #7c3aed;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-ai-analysis:hover {
+  background: #f5f3ff;
+}
+
 .footer {
   text-align: center;
   padding: 24px;

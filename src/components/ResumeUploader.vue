@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { testResume } from './TestResume.js'
+import { API, apiUpload } from '../api.js'
 
 const emit = defineEmits(['parsed'])
 const isDragging = ref(false)
@@ -29,16 +30,7 @@ const parseFile = async (file) => {
     const formData = new FormData()
     formData.append('file', file)
 
-    const response = await fetch('http://localhost:9001/api/parse', {
-      method: 'POST',
-      body: formData
-    })
-
-    if (!response.ok) {
-      throw new Error('文件解析失败')
-    }
-
-    const result = await response.json()
+    const result = await apiUpload(API.parse, formData)
 
     if (result.success) {
       emit('parsed', result.content)
@@ -69,7 +61,6 @@ const useTestResume = () => {
     <h2 class="title">上传您的简历</h2>
     <p class="subtitle">支持 PDF、Word (.docx)、TXT 格式</p>
 
-    <!-- 上传区域 -->
     <div
       class="upload-area"
       :class="{ dragging: isDragging, loading: isLoading }"
@@ -93,7 +84,6 @@ const useTestResume = () => {
 
     <div v-if="error" class="error">{{ error }}</div>
 
-    <!-- 或者粘贴文本 -->
     <div class="divider">
       <span>或者直接粘贴简历内容</span>
     </div>

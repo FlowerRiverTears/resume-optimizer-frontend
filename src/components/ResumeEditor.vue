@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch } from 'vue'
+import { API, apiPost } from '../api.js'
 
 const props = defineProps({
   resumeContent: String,
@@ -31,24 +32,11 @@ const handleAnalyze = async () => {
   isLoading.value = true
 
   try {
-    const response = await fetch('http://localhost:9001/api/analyze', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        resumeText: localResume.value,
-        jobDescription: localJobDesc.value
-      })
+    const result = await apiPost(API.analyze, {
+      resumeText: localResume.value,
+      jobDescription: localJobDesc.value
     })
 
-    if (!response.ok) {
-      throw new Error('分析失败，请重试')
-    }
-
-    const result = await response.json()
-
-    // 转换后端返回格式为前端格式
     const formattedResult = {
       atsScore: result.atsScore,
       matchScore: result.matchScore,
@@ -63,7 +51,6 @@ const handleAnalyze = async () => {
         hasSkills: true,
         totalWords: 0
       },
-      // 新增字段
       categoryScores: result.categoryScores || {},
       skillGaps: result.skillGaps || [],
       optimizationTips: result.optimizationTips || []
