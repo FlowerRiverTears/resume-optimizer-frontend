@@ -7,6 +7,7 @@ export const API = {
   
   ai: {
     chat: `${API_BASE}/ai/chat`,
+    generateResume: `${API_BASE}/ai/generate-resume`,
     analyze: `${API_BASE}/ai/analyze`,
     search: `${API_BASE}/ai/search`,
     health: `${API_BASE}/ai/health`,

@@ -14,6 +14,7 @@ const isLoading = ref(false)
 const chatContainer = ref(null)
 const selectedKeyId = ref('')
 const availableKeys = ref([])
+const expandedThinking = ref({})
 
 const loadKeys = async () => {
   try {
@@ -35,21 +36,31 @@ const sendMessage = async () => {
   scrollToBottom()
 
   try {
-    const body = {
-      message: msg,
-      provider: getProviderFromKeyId(),
-      keyId: selectedKeyId.value || props.keyId || null
-    }
+    const isResumeRequest = /生成简历|写简历|帮我写|根据.*生成/.test(msg)
 
-    if (props.resumeContent) {
-      body.context = `当前简历内容摘要：${props.resumeContent.substring(0, 500)}...`
+    let result
+    if (isResumeRequest) {
+      result = await apiPost(API.ai.generateResume, {
+        userInput: msg,
+        provider: getProviderFromKeyId(),
+        keyId: selectedKeyId.value || props.keyId || null
+      })
+    } else {
+      const body = {
+        message: msg,
+        provider: getProviderFromKeyId(),
+        keyId: selectedKeyId.value || props.keyId || null
+      }
+      if (props.resumeContent) {
+        body.context = `当前简历内容摘要：${props.resumeContent.substring(0, 500)}...`
+      }
+      result = await apiPost(API.ai.chat, body)
     }
-
-    const result = await apiPost(API.ai.chat, body)
 
     messages.value.push({
       role: 'assistant',
       content: result.answer,
+      thinking: result.thinking || null,
       provider: result.provider,
       model: result.model,
       responseTime: result.responseTimeMs,
@@ -79,10 +90,14 @@ const scrollToBottom = () => {
   }
 }
 
+const toggleThinking = (idx) => {
+  expandedThinking.value[idx] = !expandedThinking.value[idx]
+}
+
 const quickQuestions = [
   '帮我分析这份简历的优缺点',
-  '如何优化我的简历以匹配目标职位？',
-  '我需要补充哪些技能？',
+  '根据我的技能生成一份专业简历',
+  '我适合什么岗位？需要提升什么？',
   '帮我写一段个人简介',
   '简历中哪些描述需要量化？'
 ]
@@ -122,7 +137,7 @@ onMounted(() => {
       <div v-if="messages.length === 0" class="welcome">
         <div class="welcome-icon">👋</div>
         <h3>你好！我是 AI 简历助手</h3>
-        <p>我可以帮你分析简历、提供优化建议、查找匹配技能。</p>
+        <p>我可以帮你分析简历、生成简历、提供优化建议、查找匹配岗位。</p>
         <p v-if="!availableKeys.length" class="hint">
           ⚠️ 请先在上方「AI 模型配置」中输入 API Key
         </p>
@@ -147,14 +162,31 @@ onMounted(() => {
           {{ msg.role === 'user' ? '👤' : msg.role === 'error' ? '⚠️' : '🤖' }}
         </div>
         <div class="message-body">
-          <div class="message-content" v-html="msg.content.replace(/\n/g, '<br/>')"></div>
-          <div v-if="msg.searchResults && msg.searchResults.length" class="search-results">
-            <div class="results-header">📎 检索到 {{ msg.searchResults.length }} 条相关数据</div>
-            <div v-for="(r, i) in msg.searchResults" :key="i" class="result-item">
-              <span class="result-source">{{ r.source }}</span>
-              <span class="result-score">{{ (r.weightedScore * 100).toFixed(0) }}%</span>
+          <div
+            v-if="msg.thinking"
+            :class="['thinking-box', { expanded: expandedThinking[idx] }]"
+          >
+            <div class="thinking-header" @click="toggleThinking(idx)">
+              <span class="thinking-icon">💭</span>
+              <span class="thinking-label">AI 思考过程</span>
+              <span class="thinking-toggle">{{ expandedThinking[idx] ? '收起 ▲' : '展开 ▼' }}</span>
+            </div>
+            <div v-if="expandedThinking[idx]" class="thinking-content">
+              {{ msg.thinking }}
             </div>
           </div>
+
+          <div class="message-content" v-html="msg.content.replace(/\n/g, '<br/>')"></div>
+
+          <div v-if="msg.searchResults && msg.searchResults.length" class="search-results">
+            <div class="results-header">📎 RAG 检索到 {{ msg.searchResults.length }} 条相关数据</div>
+            <div v-for="(r, i) in msg.searchResults" :key="i" class="result-item">
+              <span class="result-source">{{ r.source }}</span>
+              <span class="result-category">{{ r.category }}</span>
+              <span class="result-score">相关度: {{ (r.weightedScore * 100).toFixed(0) }}%</span>
+            </div>
+          </div>
+
           <div v-if="msg.responseTime" class="message-meta">
             {{ msg.provider }} · {{ msg.model }} · {{ formatTime(msg.responseTime) }}
           </div>
@@ -175,7 +207,7 @@ onMounted(() => {
       <input
         v-model="inputMessage"
         class="input"
-        placeholder="输入问题，如：帮我分析简历的匹配度..."
+        placeholder="输入问题，如：根据我的技能生成简历..."
         @keyup.enter="sendMessage"
         :disabled="isLoading"
       />
@@ -210,9 +242,7 @@ onMounted(() => {
   border-bottom: 1px solid #e2e8f0;
 }
 
-.chat-icon {
-  font-size: 20px;
-}
+.chat-icon { font-size: 20px; }
 
 .chat-title {
   font-size: 16px;
@@ -221,9 +251,7 @@ onMounted(() => {
   flex: 1;
 }
 
-.key-selector {
-  flex-shrink: 0;
-}
+.key-selector { flex-shrink: 0; }
 
 .select-key {
   padding: 6px 12px;
@@ -246,27 +274,11 @@ onMounted(() => {
   padding: 40px 20px;
 }
 
-.welcome-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-}
+.welcome-icon { font-size: 48px; margin-bottom: 16px; }
 
-.welcome h3 {
-  font-size: 20px;
-  color: #1e293b;
-  margin-bottom: 8px;
-}
-
-.welcome p {
-  color: #64748b;
-  font-size: 14px;
-}
-
-.welcome .hint {
-  color: #f59e0b;
-  font-weight: 500;
-  margin-top: 12px;
-}
+.welcome h3 { font-size: 20px; color: #1e293b; margin-bottom: 8px; }
+.welcome p { color: #64748b; font-size: 14px; }
+.welcome .hint { color: #f59e0b; font-weight: 500; margin-top: 12px; }
 
 .quick-questions {
   display: flex;
@@ -299,9 +311,7 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
-.message.user {
-  flex-direction: row-reverse;
-}
+.message.user { flex-direction: row-reverse; }
 
 .message-avatar {
   width: 36px;
@@ -315,12 +325,53 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-.message.user .message-avatar {
-  background: #dbeafe;
+.message.user .message-avatar { background: #dbeafe; }
+
+.message-body { max-width: 75%; }
+
+.thinking-box {
+  margin-bottom: 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #eff6ff;
 }
 
-.message-body {
-  max-width: 75%;
+.thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+}
+
+.thinking-header:hover { background: #dbeafe; }
+
+.thinking-icon { font-size: 14px; }
+
+.thinking-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1d4ed8;
+  flex: 1;
+}
+
+.thinking-toggle {
+  font-size: 11px;
+  color: #3b82f6;
+}
+
+.thinking-content {
+  padding: 12px 14px;
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.6;
+  border-top: 1px solid #bfdbfe;
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow-y: auto;
 }
 
 .message-content {
@@ -356,33 +407,34 @@ onMounted(() => {
   border: 1px solid #e2e8f0;
 }
 
-.results-header {
-  font-size: 12px;
-  color: #64748b;
-  margin-bottom: 6px;
-}
+.results-header { font-size: 12px; color: #64748b; margin-bottom: 6px; }
 
 .result-item {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
   padding: 4px 0;
   font-size: 12px;
 }
 
 .result-source {
-  color: #475569;
-}
-
-.result-score {
-  color: #2563eb;
+  background: #dbeafe;
+  color: #1d4ed8;
+  padding: 1px 6px;
+  border-radius: 3px;
   font-weight: 500;
 }
 
-.message-meta {
-  font-size: 11px;
-  color: #94a3b8;
-  margin-top: 6px;
+.result-category {
+  background: #f3e8ff;
+  color: #7c3aed;
+  padding: 1px 6px;
+  border-radius: 3px;
 }
+
+.result-score { color: #2563eb; font-weight: 500; margin-left: auto; }
+
+.message-meta { font-size: 11px; color: #94a3b8; margin-top: 6px; }
 
 .typing-indicator {
   display: flex;
@@ -401,13 +453,8 @@ onMounted(() => {
   animation: typing 1.4s infinite;
 }
 
-.typing-indicator span:nth-child(2) {
-  animation-delay: 0.2s;
-}
-
-.typing-indicator span:nth-child(3) {
-  animation-delay: 0.4s;
-}
+.typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
 
 @keyframes typing {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
@@ -432,9 +479,7 @@ onMounted(() => {
   transition: border-color 0.2s;
 }
 
-.input:focus {
-  border-color: #2563eb;
-}
+.input:focus { border-color: #2563eb; }
 
 .btn-send {
   padding: 12px 24px;
@@ -449,12 +494,6 @@ onMounted(() => {
   white-space: nowrap;
 }
 
-.btn-send:hover:not(:disabled) {
-  background: #1d4ed8;
-}
-
-.btn-send:disabled {
-  background: #93c5fd;
-  cursor: not-allowed;
-}
+.btn-send:hover:not(:disabled) { background: #1d4ed8; }
+.btn-send:disabled { background: #93c5fd; cursor: not-allowed; }
 </style>

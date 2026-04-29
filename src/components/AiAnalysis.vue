@@ -16,6 +16,7 @@ const aiResult = ref(null)
 const error = ref('')
 const selectedKeyId = ref('')
 const availableKeys = ref([])
+const showThinking = ref(false)
 
 const loadKeys = async () => {
   try {
@@ -113,6 +114,15 @@ onMounted(() => {
         <span class="result-meta">
           {{ aiResult.provider }} · {{ aiResult.model }} · {{ formatTime(aiResult.responseTimeMs) }}
         </span>
+      </div>
+
+      <div v-if="aiResult.thinking" class="thinking-box">
+        <div class="thinking-header" @click="showThinking = !showThinking">
+          <span>💭</span>
+          <span class="thinking-label">AI 思考过程</span>
+          <span class="thinking-toggle">{{ showThinking ? '收起 ▲' : '展开 ▼' }}</span>
+        </div>
+        <div v-if="showThinking" class="thinking-content">{{ aiResult.thinking }}</div>
       </div>
 
       <div class="result-content" v-html="aiResult.answer.replace(/\n/g, '<br/>')"></div>
@@ -294,6 +304,48 @@ onMounted(() => {
 .result-meta {
   font-size: 12px;
   color: #94a3b8;
+}
+
+.thinking-box {
+  margin-bottom: 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #eff6ff;
+}
+
+.thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.thinking-header:hover { background: #dbeafe; }
+
+.thinking-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1d4ed8;
+  flex: 1;
+}
+
+.thinking-toggle {
+  font-size: 11px;
+  color: #3b82f6;
+}
+
+.thinking-content {
+  padding: 12px 14px;
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.6;
+  border-top: 1px solid #bfdbfe;
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow-y: auto;
 }
 
 .result-content {
