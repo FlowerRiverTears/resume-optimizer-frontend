@@ -375,11 +375,12 @@ onMounted(() => {
 }
 
 .message-content {
-  padding: 12px 16px;
+  padding: 14px 18px;
   border-radius: 12px;
   font-size: 14px;
-  line-height: 1.7;
+  line-height: 1.6;
   color: #334155;
+  word-break: break-word;
 }
 
 .message.user .message-content {
@@ -393,18 +394,39 @@ onMounted(() => {
   border-bottom-left-radius: 4px;
 }
 
-.message-content :deep(h1) { font-size: 20px; font-weight: 700; margin: 12px 0 8px; color: #1e293b; }
-.message-content :deep(h2) { font-size: 18px; font-weight: 700; margin: 12px 0 8px; color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 4px; }
-.message-content :deep(h3) { font-size: 16px; font-weight: 600; margin: 10px 0 6px; color: #334155; }
-.message-content :deep(h4) { font-size: 14px; font-weight: 600; margin: 8px 0 4px; color: #475569; }
-.message-content :deep(table) { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px; }
-.message-content :deep(td) { border: 1px solid #e2e8f0; padding: 6px 10px; }
-.message-content :deep(tr:nth-child(odd)) { background: #f8fafc; }
-.message-content :deep(ul) { padding-left: 20px; margin: 6px 0; }
-.message-content :deep(li) { margin: 3px 0; }
-.message-content :deep(hr) { border: none; border-top: 1px solid #e2e8f0; margin: 12px 0; }
+.message-content :deep(h2) {
+  font-size: 16px; font-weight: 700; margin: 10px 0 6px; color: #1e293b;
+  border-bottom: 2px solid #cbd5e1; padding-bottom: 3px;
+}
+.message-content :deep(h3) {
+  font-size: 14px; font-weight: 600; margin: 8px 0 4px; color: #334155;
+}
+.message-content :deep(h4) {
+  font-size: 13px; font-weight: 600; margin: 6px 0 2px; color: #475569;
+}
+.message-content :deep(table) {
+  width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 12px;
+}
+.message-content :deep(th) {
+  background: #e2e8f0; font-weight: 600; text-align: left;
+  border: 1px solid #cbd5e1; padding: 5px 8px;
+}
+.message-content :deep(td) {
+  border: 1px solid #e2e8f0; padding: 4px 8px;
+}
+.message-content :deep(tr:nth-child(even)) { background: #f8fafc; }
+.message-content :deep(ul) { padding-left: 18px; margin: 4px 0; }
+.message-content :deep(ol) { padding-left: 18px; margin: 4px 0; }
+.message-content :deep(li) { margin: 2px 0; line-height: 1.5; }
+.message-content :deep(hr) { border: none; border-top: 1px solid #e2e8f0; margin: 8px 0; }
 .message-content :deep(strong) { color: #1e293b; }
-.message-content :deep(blockquote) { border-left: 3px solid #2563eb; padding-left: 12px; color: #64748b; margin: 8px 0; }
+.message-content :deep(em) { font-style: italic; }
+.message-content :deep(code) { background: #e2e8f0; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+.message-content :deep(blockquote) {
+  border-left: 3px solid #2563eb; padding-left: 10px; color: #64748b; margin: 6px 0; font-size: 13px;
+}
+.message-content :deep(p) { margin: 4px 0; }
+.message-content :deep(br) { display: block; margin: 2px 0; content: ""; }
 
 .message.error .message-content {
   background: #fef2f2;
