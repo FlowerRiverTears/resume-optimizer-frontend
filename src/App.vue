@@ -134,6 +134,7 @@ const handleAiAnalysisDone = (result) => {
           <AnalysisResult
             :result="analysisResult"
             :resume-content="resumeContent"
+            :key-id="activeKeyId"
             @reset="handleReset"
             @compare="openComparison"
           />

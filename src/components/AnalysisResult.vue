@@ -1,10 +1,13 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import * as echarts from 'echarts'
+import { API, apiPost } from '../api.js'
 
 const props = defineProps({
   result: Object,
-  resumeContent: String
+  resumeContent: String,
+  keyId: String,
+  provider: String
 })
 
 const emit = defineEmits(['reset', 'compare'])
@@ -14,6 +17,11 @@ const radarChartRef = ref(null)
 const barChartRef = ref(null)
 let radarChart = null
 let barChart = null
+
+const atsScoreData = ref(null)
+const isLoadingAts = ref(false)
+const atsError = ref('')
+const needApiKey = ref(false)
 
 const goBack = () => {
   emit('reset')
@@ -26,71 +34,80 @@ const getScoreColor = (score) => {
 }
 
 const getScoreLabel = (score) => {
+  if (score >= 90) return '优秀'
+  if (score >= 75) return '良好'
+  if (score >= 60) return '一般'
+  if (score >= 40) return '待改进'
+  return '需重写'
+}
+
+const getScoreLabelShort = (score) => {
   if (score >= 80) return '优秀'
   if (score >= 60) return '良好'
   if (score >= 40) return '一般'
   return '待改进'
 }
 
-// 计算分类数据用于雷达图
 const categoryData = computed(() => {
-  if (!props.result.categoryScores) {
+  const scores = atsScoreData.value?.categoryDetails || props.result?.categoryScores
+  if (!scores) {
     return {
-      categories: ['frontend', 'backend', 'database', 'devops'],
+      categories: ['前端', '后端', '数据库', 'DevOps'],
       values: [0, 0, 0, 0]
     }
   }
 
-  const scores = props.result.categoryScores
-  const categories = Object.keys(scores)
-  const values = categories.map(cat => scores[cat].score || 0)
+  let categories, values
+  if (atsScoreData.value?.categoryDetails) {
+    categories = Object.values(scores).map(c => c.name)
+    values = Object.values(scores).map(c => c.score)
+  } else {
+    categories = Object.keys(scores).map(getCategoryName)
+    values = Object.values(scores).map(c => c.score || 0)
+  }
 
   return { categories, values }
 })
 
-// 初始化雷达图
 const initRadarChart = () => {
-  if (!radarChartRef.value) return
+  if (!radarChartRef.value) {
+    return
+  }
 
+  if (radarChart) {
+    radarChart.dispose()
+  }
   radarChart = echarts.init(radarChartRef.value)
+
+  const cats = categoryData.value.categories
+  const vals = categoryData.value.values
+
+  if (!cats.length) return
 
   const option = {
     title: {
       text: '技能匹配雷达图',
       left: 'center',
-      textStyle: {
-        fontSize: 16,
-        fontWeight: 'normal'
-      }
+      textStyle: { fontSize: 16, fontWeight: 'normal' }
     },
-    tooltip: {
-      trigger: 'item'
-    },
+    tooltip: { trigger: 'item' },
     radar: {
-      indicator: categoryData.value.categories.map(cat => ({
-        name: getCategoryName(cat),
+      indicator: cats.map(cat => ({
+        name: cat,
         max: 100
       })),
       radius: '65%',
       splitNumber: 4,
-      axisName: {
-        color: '#666'
-      }
+      axisName: { color: '#666' }
     },
     series: [{
       type: 'radar',
       data: [{
-        value: categoryData.value.values,
+        value: vals,
         name: '匹配度',
-        areaStyle: {
-          color: 'rgba(37, 99, 235, 0.3)'
-        },
-        lineStyle: {
-          color: '#2563eb'
-        },
-        itemStyle: {
-          color: '#2563eb'
-        }
+        areaStyle: { color: 'rgba(37, 99, 235, 0.3)' },
+        lineStyle: { color: '#2563eb' },
+        itemStyle: { color: '#2563eb' }
       }]
     }]
   }
@@ -98,7 +115,6 @@ const initRadarChart = () => {
   radarChart.setOption(option)
 }
 
-// 获取分类中文名
 const getCategoryName = (cat) => {
   const names = {
     frontend: '前端',
@@ -110,55 +126,47 @@ const getCategoryName = (cat) => {
   return names[cat] || cat
 }
 
-// 初始化柱状图
 const initBarChart = () => {
-  if (!barChartRef.value || !props.result.categoryScores) return
+  if (!barChartRef.value) return
 
+  if (barChart) {
+    barChart.dispose()
+  }
   barChart = echarts.init(barChartRef.value)
 
-  const scores = props.result.categoryScores
-  const categories = Object.keys(scores).map(getCategoryName)
-  const matched = categories.map(cat => {
-    const key = Object.keys(scores).find(k => getCategoryName(k) === cat)
-    return scores[key]?.matchedCount || 0
-  })
-  const total = categories.map(cat => {
-    const key = Object.keys(scores).find(k => getCategoryName(k) === cat)
-    return scores[key]?.totalCount || 0
-  })
+  const scores = atsScoreData.value?.categoryDetails || props.result?.categoryScores
+  if (!scores) return
+
+  let categories, matched, total
+  if (atsScoreData.value?.categoryDetails) {
+    categories = Object.values(scores).map(c => c.name)
+    matched = Object.values(scores).map(c => c.matched)
+    total = Object.values(scores).map(c => c.total)
+  } else {
+    categories = Object.keys(scores).map(getCategoryName)
+    matched = categories.map(cat => {
+      const key = Object.keys(scores).find(k => getCategoryName(k) === cat)
+      return scores[key]?.matchedCount || 0
+    })
+    total = categories.map(cat => {
+      const key = Object.keys(scores).find(k => getCategoryName(k) === cat)
+      return scores[key]?.totalCount || 0
+    })
+  }
+
+  if (!categories.length) return
 
   const option = {
     title: {
       text: '技能数量对比',
       left: 'center',
-      textStyle: {
-        fontSize: 14,
-        fontWeight: 'normal'
-      }
+      textStyle: { fontSize: 14, fontWeight: 'normal' }
     },
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: { type: 'shadow' }
-    },
-    legend: {
-      data: ['已匹配', '职位要求'],
-      bottom: 0
-    },
-    grid: {
-      left: '3%',
-      right: '4%',
-      bottom: '15%',
-      top: '15%',
-      containLabel: true
-    },
-    xAxis: {
-      type: 'category',
-      data: categories
-    },
-    yAxis: {
-      type: 'value',
-      minInterval: 1
-    },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    legend: { data: ['已匹配', '职位要求'], bottom: 0 },
+    grid: { left: '3%', right: '4%', bottom: '15%', top: '15%', containLabel: true },
+    xAxis: { type: 'category', data: categories },
+    yAxis: { type: 'value', minInterval: 1 },
     series: [{
       name: '已匹配',
       type: 'bar',
@@ -175,19 +183,143 @@ const initBarChart = () => {
   barChart.setOption(option)
 }
 
-onMounted(() => {
+const initCharts = async () => {
+  await nextTick()
+  await nextTick()
   initRadarChart()
   initBarChart()
+}
 
-  // 响应窗口大小变化
+const fetchAtsScore = async () => {
+  if (!props.resumeContent) return
+  
+  if (!props.keyId) {
+    needApiKey.value = true
+    return
+  }
+  
+  isLoadingAts.value = true
+  atsError.value = ''
+  needApiKey.value = false
+  
+  try {
+    const data = await apiPost(API.atsScore, {
+      resumeText: props.resumeContent,
+      jobDescription: '',
+      provider: props.provider || '',
+      keyId: props.keyId
+    })
+    atsScoreData.value = data
+    
+    await initCharts()
+  } catch (err) {
+    atsError.value = 'ATS评分获取失败: ' + err.message
+  } finally {
+    isLoadingAts.value = false
+  }
+}
+
+const displayData = computed(() => {
+  const source = atsScoreData.value
+  const isDataReady = source && source.overallScore !== undefined && !isLoadingAts.value
+  
+  if (!isDataReady) {
+    return null
+  }
+  
+  if (source) {
+    return {
+      atsScore: source.overallScore,
+      matchScore: source.jobMatchScore?.score || 0,
+      matchedCount: source.matchedCount || 0,
+      missingCount: source.missingCount || 0,
+      grade: source.grade,
+      gradeDescription: source.gradeDescription,
+      categoryDetails: source.categoryDetails,
+      skillGapDetails: source.skillGapDetails,
+      optimizationSuggestions: source.optimizationSuggestions,
+      structureScore: source.structureScore,
+      contentScore: source.contentScore,
+      keywordScore: source.keywordScore
+    }
+  }
+  return null
+})
+
+onMounted(() => {
+  fetchAtsScore()
+
   window.addEventListener('resize', () => {
     radarChart?.resize()
     barChart?.resize()
   })
 })
 
+watch(() => props.keyId, (newKeyId) => {
+  if (newKeyId) {
+    fetchAtsScore()
+  }
+})
+
+watch(() => props.result, () => {
+  fetchAtsScore()
+}, { deep: true })
+
+watch(displayData, (newVal) => {
+  if (newVal) {
+    nextTick(() => {
+      initRadarChart()
+      initBarChart()
+    })
+  }
+})
+
 const exportPDF = () => {
-  window.print()
+  const printContent = document.querySelector('.result')
+  if (!printContent) return
+  
+  const printWindow = window.open('', '_blank')
+  if (!printWindow) {
+    alert('请允许弹出窗口以导出PDF')
+    return
+  }
+  
+  const styles = Array.from(document.querySelectorAll('style'))
+    .map(s => s.textContent)
+    .join('\n')
+  
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>简历分析报告</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 20px; color: #1e293b; }
+        .nav-tabs, .actions, .loading-overlay, .api-key-notice, .error-notice { display: none !important; }
+        .score-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+        .score-card { background: #f8fafc; border-radius: 12px; padding: 20px; text-align: center; }
+        .score-value { font-size: 36px; font-weight: 700; }
+        .stat-value { font-size: 32px; font-weight: 700; color: #10b981; }
+        .stat-value.warning { color: #f59e0b; }
+        .category-item { padding: 12px 16px; background: #f8fafc; border-radius: 8px; margin-bottom: 12px; }
+        .suggestion-card { background: #fff; border-radius: 8px; padding: 16px; border-left: 4px solid #2563eb; margin-bottom: 12px; }
+        .structure-item { padding: 12px; margin-bottom: 8px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #e2e8f0; padding: 8px; }
+        th { background: #f1f5f9; }
+        ${styles}
+      </style>
+    </head>
+    <body>
+      ${printContent.innerHTML}
+    </body>
+    </html>
+  `)
+  printWindow.document.close()
+  
+  setTimeout(() => {
+    printWindow.print()
+  }, 500)
 }
 </script>
 
@@ -195,42 +327,66 @@ const exportPDF = () => {
   <div class="result">
     <h2 class="title">简历分析报告</h2>
 
-    <!-- 分数展示 -->
+    <div v-if="isLoadingAts" class="loading-overlay">
+      <div class="loading-spinner"></div>
+      <p>正在进行ATS深度分析...</p>
+      <p class="loading-sub">LLM + RAG 检索增强分析中，请稍候</p>
+    </div>
+
+    <div v-if="needApiKey && !isLoadingAts" class="api-key-notice">
+      <div class="notice-icon">🔑</div>
+      <h3>需要 API Key 才能进行深度分析</h3>
+      <p>请先在左侧输入 API Key 并验证通过，系统将使用 LLM + RAG 进行深度简历评分分析</p>
+      <div class="notice-features">
+        <div class="feature-item">🤖 LLM 智能评分</div>
+        <div class="feature-item">📚 RAG 检索增强</div>
+        <div class="feature-item">📊 动态分析</div>
+        <div class="feature-item">💡 智能建议</div>
+      </div>
+    </div>
+
+    <div v-if="atsError && !isLoadingAts" class="error-notice">
+      <p>{{ atsError }}</p>
+    </div>
+
+    <template v-if="displayData && !isLoadingAts && !needApiKey">
     <div class="score-cards">
       <div class="score-card main-score">
         <div class="score-label">ATS 综合评分</div>
-        <div class="score-value" :style="{ color: getScoreColor(result.atsScore) }">
-          {{ result.atsScore }}
+        <div class="score-value" :style="{ color: getScoreColor(displayData.atsScore) }">
+          {{ displayData.atsScore }}
         </div>
-        <div class="score-desc">{{ getScoreLabel(result.atsScore) }}</div>
+        <div class="score-desc">{{ displayData.grade }}</div>
         <div class="score-bar">
-          <div class="score-bar-fill" :style="{ width: result.atsScore + '%', backgroundColor: getScoreColor(result.atsScore) }"></div>
+          <div class="score-bar-fill" :style="{ width: displayData.atsScore + '%', backgroundColor: getScoreColor(displayData.atsScore) }"></div>
+        </div>
+        <div v-if="displayData.gradeDescription" class="score-tip">
+          {{ displayData.gradeDescription }}
         </div>
       </div>
 
       <div class="score-card main-score">
         <div class="score-label">职位匹配度</div>
-        <div class="score-value" :style="{ color: getScoreColor(result.matchScore) }">
-          {{ result.matchScore }}%
+        <div class="score-value" :style="{ color: getScoreColor(displayData.matchScore) }">
+          {{ displayData.matchScore }}%
         </div>
-        <div class="score-desc">{{ getScoreLabel(result.matchScore) }}</div>
+        <div class="score-desc">{{ getScoreLabelShort(displayData.matchScore) }}</div>
         <div class="score-bar">
-          <div class="score-bar-fill" :style="{ width: result.matchScore + '%', backgroundColor: getScoreColor(result.matchScore) }"></div>
+          <div class="score-bar-fill" :style="{ width: displayData.matchScore + '%', backgroundColor: getScoreColor(displayData.matchScore) }"></div>
         </div>
       </div>
 
       <div class="score-card stat-card">
-        <div class="stat-value">{{ result.foundKeywords?.length || 0 }}</div>
+        <div class="stat-value">{{ displayData.matchedCount }}</div>
         <div class="stat-label">匹配技能</div>
       </div>
 
       <div class="score-card stat-card">
-        <div class="stat-value warning">{{ result.missingKeywords?.length || 0 }}</div>
+        <div class="stat-value warning">{{ displayData.missingCount }}</div>
         <div class="stat-label">缺失技能</div>
       </div>
     </div>
 
-    <!-- 导航 -->
     <div class="nav-tabs">
       <button
         :class="['nav-tab', { active: activeSection === 'overview' }]"
@@ -258,26 +414,23 @@ const exportPDF = () => {
       </button>
     </div>
 
-    <!-- 内容 -->
     <div class="content">
-      <!-- 技能雷达图 -->
       <div v-if="activeSection === 'overview'" class="section">
         <div class="charts-container">
           <div ref="radarChartRef" class="chart"></div>
           <div ref="barChartRef" class="chart"></div>
         </div>
 
-        <!-- 分类详情 -->
-        <div v-if="result.categoryScores" class="category-details">
+        <div v-if="displayData.categoryDetails" class="category-details">
           <h4>各分类匹配详情</h4>
           <div class="category-list">
             <div
-              v-for="(score, category) in result.categoryScores"
-              :key="category"
+              v-for="(score, key) in displayData.categoryDetails"
+              :key="key"
               class="category-item"
             >
               <div class="category-header">
-                <span class="category-name">{{ getCategoryName(category) }}</span>
+                <span class="category-name">{{ score.name || getCategoryName(key) }}</span>
                 <span class="category-score" :style="{ color: getScoreColor(score.score) }">
                   {{ score.score }}%
                 </span>
@@ -289,19 +442,24 @@ const exportPDF = () => {
                 ></div>
               </div>
               <div class="category-count">
-                已匹配 {{ score.matchedCount }} / 要求 {{ score.totalCount }} 项
+                已匹配 {{ score.matched || score.matchedCount }} / 要求 {{ score.total || score.totalCount }} 项
+              </div>
+              <div v-if="score.matchedSkills?.length" class="category-skills">
+                <span class="skill-tag matched" v-for="s in score.matchedSkills.slice(0, 5)" :key="s">{{ s }}</span>
+              </div>
+              <div v-if="score.missingSkills?.length" class="category-skills">
+                <span class="skill-tag missing" v-for="s in score.missingSkills.slice(0, 3)" :key="s">{{ s }}</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 关键词详情 -->
       <div v-if="activeSection === 'keywords'" class="section">
         <h3>已匹配技能</h3>
         <div class="tags">
           <span
-            v-for="keyword in result.foundKeywords"
+            v-for="keyword in (atsScoreData?.matchedSkills || result?.foundKeywords || [])"
             :key="keyword"
             class="tag tag-success"
           >
@@ -312,7 +470,7 @@ const exportPDF = () => {
         <h3 style="margin-top: 32px;">缺失技能（建议补充）</h3>
         <div class="skill-gaps">
           <div
-            v-for="gap in result.skillGaps"
+            v-for="gap in (displayData.skillGapDetails || result?.skillGaps || [])"
             :key="gap.skill"
             class="gap-item"
           >
@@ -322,128 +480,144 @@ const exportPDF = () => {
               <span class="gap-importance">重要性: {{ gap.importance }}/5</span>
             </div>
             <div class="gap-suggestion">{{ gap.suggestion }}</div>
+            <div v-if="gap.learningResources?.length" class="gap-resources">
+              <span class="resource-label">学习资源:</span>
+              <span v-for="r in gap.learningResources" :key="r" class="resource-tag">{{ r }}</span>
+            </div>
           </div>
         </div>
 
-        <div v-if="!result.missingKeywords || result.missingKeywords.length === 0" class="empty-state">
+        <div v-if="displayData.missingCount === 0" class="empty-state">
           <p>没有缺失技能，您的简历与职位高度匹配！</p>
         </div>
       </div>
 
-      <!-- 优化建议 -->
       <div v-if="activeSection === 'suggestions'" class="section">
         <h3>优化建议</h3>
-        <ul class="suggestion-list">
+        
+        <div v-if="displayData.optimizationSuggestions?.length" class="suggestion-cards">
+          <div
+            v-for="(suggestion, index) in displayData.optimizationSuggestions"
+            :key="index"
+            class="suggestion-card"
+            :class="'priority-' + suggestion.priority?.toLowerCase()"
+          >
+            <div class="suggestion-header">
+              <span class="suggestion-type">{{ suggestion.type }}</span>
+              <span class="suggestion-priority" :class="'priority-' + suggestion.priority?.toLowerCase()">
+                {{ suggestion.priority }}
+              </span>
+            </div>
+            <div class="suggestion-title">{{ suggestion.title }}</div>
+            <div class="suggestion-desc">{{ suggestion.description }}</div>
+            <div v-if="suggestion.impact" class="suggestion-impact">
+              预期效果: {{ suggestion.impact }}
+            </div>
+          </div>
+        </div>
+
+        <ul v-else class="suggestion-list">
           <li
-            v-for="(suggestion, index) in result.suggestions"
+            v-for="(suggestion, index) in result?.suggestions"
             :key="index"
             class="suggestion-item"
           >
             {{ suggestion }}
           </li>
         </ul>
-
-        <!-- 优化提示详情 -->
-        <div v-if="result.optimizationTips && result.optimizationTips.length > 0" class="tips-section">
-          <h4>详细优化提示</h4>
-          <div
-            v-for="(tip, index) in result.optimizationTips"
-            :key="index"
-            class="tip-card"
-          >
-            <div class="tip-type" :class="'tip-' + tip.type">
-              {{ tip.type === 'add' ? '建议添加' : tip.type === 'improve' ? '建议改进' : '建议删除' }}
-            </div>
-            <div class="tip-content">
-              <div v-if="tip.suggestedText" class="tip-suggested">
-                {{ tip.suggestedText }}
-              </div>
-              <div v-if="tip.reason" class="tip-reason">
-                原因: {{ tip.reason }}
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
-      <!-- 结构分析 -->
       <div v-if="activeSection === 'structure'" class="section">
         <h3>简历结构分析</h3>
+        
+        <div v-if="displayData.structureScore" class="structure-scores">
+          <div class="structure-score-card">
+            <div class="structure-score-value" :style="{ color: getScoreColor(displayData.structureScore.score) }">
+              {{ displayData.structureScore.score }}
+            </div>
+            <div class="structure-score-label">结构评分</div>
+            <div class="structure-score-level">{{ displayData.structureScore.level }}</div>
+          </div>
+          
+          <div class="structure-score-card">
+            <div class="structure-score-value" :style="{ color: getScoreColor(displayData.contentScore?.score || 0) }">
+              {{ displayData.contentScore?.score || 0 }}
+            </div>
+            <div class="structure-score-label">内容评分</div>
+            <div class="structure-score-level">{{ displayData.contentScore?.level || '-' }}</div>
+          </div>
+          
+          <div class="structure-score-card">
+            <div class="structure-score-value" :style="{ color: getScoreColor(displayData.keywordScore?.score || 0) }">
+              {{ displayData.keywordScore?.score || 0 }}
+            </div>
+            <div class="structure-score-label">关键词评分</div>
+            <div class="structure-score-level">{{ displayData.keywordScore?.level || '-' }}</div>
+          </div>
+        </div>
+
         <div class="structure-list">
           <div
             class="structure-item"
-            :class="{ success: result.structure.hasContactInfo }"
+            :class="{ success: displayData.structureScore?.hasContact || result?.structure?.hasContactInfo }"
           >
-            <span class="icon">{{ result.structure.hasContactInfo ? '✓' : '✗' }}</span>
+            <span class="icon">{{ (displayData.structureScore?.hasContact || result?.structure?.hasContactInfo) ? '✓' : '✗' }}</span>
             <div class="structure-info">
               <div class="structure-name">联系方式</div>
               <div class="structure-status">
-                {{ result.structure.hasContactInfo ? '已包含' : '建议添加邮箱、电话' }}
+                {{ (displayData.structureScore?.hasContact || result?.structure?.hasContactInfo) ? '已包含' : '建议添加邮箱、电话' }}
               </div>
             </div>
           </div>
 
           <div
             class="structure-item"
-            :class="{ success: result.structure.hasSummary }"
+            :class="{ success: displayData.structureScore?.hasSummary || result?.structure?.hasSummary }"
           >
-            <span class="icon">{{ result.structure.hasSummary ? '✓' : '✗' }}</span>
+            <span class="icon">{{ (displayData.structureScore?.hasSummary || result?.structure?.hasSummary) ? '✓' : '✗' }}</span>
             <div class="structure-info">
               <div class="structure-name">个人简介</div>
               <div class="structure-status">
-                {{ result.structure.hasSummary ? '已包含' : '建议添加简历摘要' }}
+                {{ (displayData.structureScore?.hasSummary || result?.structure?.hasSummary) ? '已包含' : '建议添加简历摘要' }}
               </div>
             </div>
           </div>
 
           <div
             class="structure-item"
-            :class="{ success: result.structure.hasExperience }"
+            :class="{ success: displayData.structureScore?.hasExperience || result?.structure?.hasExperience }"
           >
-            <span class="icon">{{ result.structure.hasExperience ? '✓' : '✗' }}</span>
+            <span class="icon">{{ (displayData.structureScore?.hasExperience || result?.structure?.hasExperience) ? '✓' : '✗' }}</span>
             <div class="structure-info">
               <div class="structure-name">工作经历</div>
               <div class="structure-status">
-                {{ result.structure.hasExperience ? '已包含' : '建议添加工作经历' }}
+                {{ (displayData.structureScore?.hasExperience || result?.structure?.hasExperience) ? '已包含' : '建议添加工作经历' }}
               </div>
             </div>
           </div>
 
           <div
             class="structure-item"
-            :class="{ success: result.structure.hasEducation }"
+            :class="{ success: displayData.structureScore?.hasEducation || result?.structure?.hasEducation }"
           >
-            <span class="icon">{{ result.structure.hasEducation ? '✓' : '✗' }}</span>
+            <span class="icon">{{ (displayData.structureScore?.hasEducation || result?.structure?.hasEducation) ? '✓' : '✗' }}</span>
             <div class="structure-info">
               <div class="structure-name">教育背景</div>
               <div class="structure-status">
-                {{ result.structure.hasEducation ? '已包含' : '建议添加教育信息' }}
-              </div>
-            </div>
-          </div>
-
-          <div
-            class="structure-item"
-            :class="{ success: result.structure.hasSkills }"
-          >
-            <span class="icon">{{ result.structure.hasSkills ? '✓' : '✗' }}</span>
-            <div class="structure-info">
-              <div class="structure-name">技能特长</div>
-              <div class="structure-status">
-                {{ result.structure.hasSkills ? '已包含' : '建议添加技能清单' }}
+                {{ (displayData.structureScore?.hasEducation || result?.structure?.hasEducation) ? '已包含' : '建议添加教育信息' }}
               </div>
             </div>
           </div>
         </div>
 
         <div class="word-count">
-          <div class="word-count-value">{{ result.structure.totalWords }}</div>
+          <div class="word-count-value">{{ displayData.structureScore?.wordCount || result?.structure?.totalWords || 0 }}</div>
           <div class="word-count-label">总字数</div>
+          <div class="word-count-level">{{ displayData.structureScore?.wordCountLevel || '' }}</div>
         </div>
       </div>
     </div>
 
-    <!-- 操作按钮 -->
     <div class="actions">
       <button class="btn btn-outline" @click="goBack">
         重新编辑
@@ -455,6 +629,7 @@ const exportPDF = () => {
         导出 PDF
       </button>
     </div>
+    </template>
   </div>
 </template>
 
@@ -472,7 +647,86 @@ const exportPDF = () => {
   color: #1e293b;
 }
 
-/* 分数卡片 */
+.loading-overlay {
+  text-align: center;
+  padding: 40px;
+  background: #f8fafc;
+  border-radius: 12px;
+  margin-bottom: 24px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-sub {
+  font-size: 13px;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+.api-key-notice {
+  text-align: center;
+  padding: 48px 32px;
+  background: linear-gradient(135deg, #eff6ff, #f5f3ff);
+  border-radius: 12px;
+  margin-bottom: 24px;
+  border: 1px dashed #93c5fd;
+}
+
+.notice-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.api-key-notice h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 8px;
+}
+
+.api-key-notice p {
+  font-size: 14px;
+  color: #64748b;
+  margin-bottom: 20px;
+}
+
+.notice-features {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.feature-item {
+  padding: 8px 16px;
+  background: #fff;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #475569;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.error-notice {
+  padding: 16px 20px;
+  background: #fef2f2;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  color: #dc2626;
+  font-size: 14px;
+}
+
 .score-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -531,6 +785,13 @@ const exportPDF = () => {
   transition: width 0.5s ease;
 }
 
+.score-tip {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 8px;
+  line-height: 1.4;
+}
+
 .stat-value {
   font-size: 32px;
   font-weight: 700;
@@ -547,7 +808,6 @@ const exportPDF = () => {
   margin-top: 4px;
 }
 
-/* 导航 */
 .nav-tabs {
   display: flex;
   background: #f1f5f9;
@@ -579,7 +839,6 @@ const exportPDF = () => {
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
-/* 内容区 */
 .content {
   background: #fafafa;
   border-radius: 12px;
@@ -601,7 +860,6 @@ const exportPDF = () => {
   color: #475569;
 }
 
-/* 图表容器 */
 .charts-container {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -616,7 +874,6 @@ const exportPDF = () => {
   padding: 16px;
 }
 
-/* 分类详情 */
 .category-details {
   background: #fff;
   border-radius: 8px;
@@ -669,9 +926,32 @@ const exportPDF = () => {
 .category-count {
   font-size: 12px;
   color: #64748b;
+  margin-bottom: 8px;
 }
 
-/* 标签 */
+.category-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.skill-tag {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.skill-tag.matched {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.skill-tag.missing {
+  background: #fef3c7;
+  color: #d97706;
+}
+
 .tags {
   display: flex;
   flex-wrap: wrap;
@@ -690,12 +970,6 @@ const exportPDF = () => {
   color: #059669;
 }
 
-.tag-warning {
-  background: #fef3c7;
-  color: #d97706;
-}
-
-/* 技能差距 */
 .skill-gaps {
   display: flex;
   flex-direction: column;
@@ -739,6 +1013,27 @@ const exportPDF = () => {
   color: #475569;
 }
 
+.gap-resources {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.resource-label {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.resource-tag {
+  padding: 2px 8px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
 .empty-state {
   text-align: center;
   padding: 40px;
@@ -747,7 +1042,79 @@ const exportPDF = () => {
   border-radius: 8px;
 }
 
-/* 建议列表 */
+.suggestion-cards {
+  display: grid;
+  gap: 12px;
+}
+
+.suggestion-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  border-left: 4px solid #2563eb;
+}
+
+.suggestion-card.priority-高 {
+  border-left-color: #ef4444;
+}
+
+.suggestion-card.priority-中 {
+  border-left-color: #f59e0b;
+}
+
+.suggestion-card.priority-低 {
+  border-left-color: #10b981;
+}
+
+.suggestion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.suggestion-type {
+  padding: 2px 8px;
+  background: #f1f5f9;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.suggestion-priority {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.suggestion-priority.priority-高 {
+  color: #ef4444;
+}
+
+.suggestion-priority.priority-中 {
+  color: #f59e0b;
+}
+
+.suggestion-priority.priority-低 {
+  color: #10b981;
+}
+
+.suggestion-title {
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.suggestion-desc {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.suggestion-impact {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #2563eb;
+}
+
 .suggestion-list {
   list-style: none;
 }
@@ -762,56 +1129,37 @@ const exportPDF = () => {
   color: #334155;
 }
 
-/* 优化提示卡片 */
-.tips-section {
-  margin-top: 24px;
+.structure-scores {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
 }
 
-.tip-card {
-  display: flex;
-  gap: 16px;
-  padding: 16px;
+.structure-score-card {
   background: #fff;
   border-radius: 8px;
-  margin-bottom: 12px;
+  padding: 20px;
+  text-align: center;
 }
 
-.tip-type {
-  padding: 4px 12px;
-  border-radius: 4px;
+.structure-score-value {
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.structure-score-label {
   font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  height: fit-content;
-}
-
-.tip-add {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.tip-improve {
-  background: #fef3c7;
-  color: #b45309;
-}
-
-.tip-delete {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-.tip-suggested {
-  font-weight: 500;
-  color: #1e293b;
-  margin-bottom: 4px;
-}
-
-.tip-reason {
-  font-size: 13px;
   color: #64748b;
+  margin-top: 4px;
 }
 
-/* 结构列表 */
+.structure-score-level {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
 .structure-list {
   display: flex;
   flex-direction: column;
@@ -885,7 +1233,12 @@ const exportPDF = () => {
   margin-top: 4px;
 }
 
-/* 操作按钮 */
+.word-count-level {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
 .actions {
   display: flex;
   justify-content: center;
@@ -931,13 +1284,16 @@ const exportPDF = () => {
   background: #059669;
 }
 
-/* 响应式 */
 @media (max-width: 768px) {
   .score-cards {
     grid-template-columns: repeat(2, 1fr);
   }
 
   .charts-container {
+    grid-template-columns: 1fr;
+  }
+
+  .structure-scores {
     grid-template-columns: 1fr;
   }
 
@@ -950,7 +1306,6 @@ const exportPDF = () => {
   }
 }
 
-/* 打印样式 */
 @media print {
   .nav-tabs,
   .actions {

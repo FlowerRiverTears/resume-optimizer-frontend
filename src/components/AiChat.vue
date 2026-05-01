@@ -394,39 +394,120 @@ onMounted(() => {
   border-bottom-left-radius: 4px;
 }
 
+.message-content :deep(h1) {
+  font-size: 18px; font-weight: 800; margin: 14px 0 8px; color: #0f172a;
+  border-bottom: 2px solid #3b82f6; padding-bottom: 4px;
+}
 .message-content :deep(h2) {
-  font-size: 16px; font-weight: 700; margin: 10px 0 6px; color: #1e293b;
-  border-bottom: 2px solid #cbd5e1; padding-bottom: 3px;
+  font-size: 16px; font-weight: 700; margin: 12px 0 6px; color: #1e293b;
+  border-bottom: 1.5px solid #e2e8f0; padding-bottom: 4px;
 }
 .message-content :deep(h3) {
-  font-size: 14px; font-weight: 600; margin: 8px 0 4px; color: #334155;
+  font-size: 14px; font-weight: 600; margin: 10px 0 4px; color: #334155;
 }
 .message-content :deep(h4) {
-  font-size: 13px; font-weight: 600; margin: 6px 0 2px; color: #475569;
+  font-size: 13px; font-weight: 600; margin: 8px 0 3px; color: #475569;
+}
+.message-content :deep(h5) {
+  font-size: 12px; font-weight: 600; margin: 6px 0 2px; color: #64748b;
+}
+.message-content :deep(h6) {
+  font-size: 12px; font-weight: 600; margin: 6px 0 2px; color: #94a3b8;
+}
+.message-content :deep(p) {
+  margin: 4px 0; line-height: 1.7;
+}
+.message-content :deep(.table-wrapper) {
+  overflow-x: auto; margin: 8px 0; border-radius: 6px;
+  border: 1px solid #e2e8f0;
 }
 .message-content :deep(table) {
-  width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 12px;
+  width: 100%; border-collapse: collapse; font-size: 12px;
 }
 .message-content :deep(th) {
-  background: #e2e8f0; font-weight: 600; text-align: left;
-  border: 1px solid #cbd5e1; padding: 5px 8px;
+  background: #f1f5f9; font-weight: 600; text-align: left;
+  border-bottom: 2px solid #cbd5e1; padding: 6px 10px;
+  color: #334155; white-space: nowrap;
 }
 .message-content :deep(td) {
-  border: 1px solid #e2e8f0; padding: 4px 8px;
+  border-bottom: 1px solid #f1f5f9; padding: 5px 10px;
+  color: #475569;
 }
-.message-content :deep(tr:nth-child(even)) { background: #f8fafc; }
-.message-content :deep(ul) { padding-left: 18px; margin: 4px 0; }
-.message-content :deep(ol) { padding-left: 18px; margin: 4px 0; }
-.message-content :deep(li) { margin: 2px 0; line-height: 1.5; }
-.message-content :deep(hr) { border: none; border-top: 1px solid #e2e8f0; margin: 8px 0; }
-.message-content :deep(strong) { color: #1e293b; }
-.message-content :deep(em) { font-style: italic; }
-.message-content :deep(code) { background: #e2e8f0; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+.message-content :deep(tr:hover td) {
+  background: #f8fafc;
+}
+.message-content :deep(tr:nth-child(even) td) {
+  background: #fafbfc;
+}
+.message-content :deep(ul) {
+  padding-left: 20px; margin: 4px 0; list-style-type: disc;
+}
+.message-content :deep(ol) {
+  padding-left: 20px; margin: 4px 0; list-style-type: decimal;
+}
+.message-content :deep(li) {
+  margin: 3px 0; line-height: 1.6;
+}
+.message-content :deep(li.task-item) {
+  list-style: none; margin-left: -20px; display: flex; align-items: center; gap: 6px;
+}
+.message-content :deep(li.task-item input[type="checkbox"]) {
+  accent-color: #3b82f6; width: 14px; height: 14px; flex-shrink: 0;
+}
+.message-content :deep(hr) {
+  border: none; border-top: 1px solid #e2e8f0; margin: 10px 0;
+}
+.message-content :deep(strong) {
+  color: #1e293b; font-weight: 700;
+}
+.message-content :deep(em) {
+  font-style: italic; color: #475569;
+}
+.message-content :deep(del) {
+  text-decoration: line-through; color: #94a3b8;
+}
+.message-content :deep(code) {
+  background: #f1f5f9; color: #e11d48; padding: 1px 5px; border-radius: 3px;
+  font-size: 12px; font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+.message-content :deep(.code-block) {
+  position: relative; margin: 8px 0; border-radius: 6px;
+  background: #1e293b; overflow: hidden;
+}
+.message-content :deep(.code-block .code-lang) {
+  position: absolute; top: 0; right: 0; padding: 2px 8px;
+  background: #334155; color: #94a3b8; font-size: 10px;
+  border-bottom-left-radius: 4px; z-index: 1;
+}
+.message-content :deep(.code-block pre) {
+  margin: 0; padding: 14px 16px; overflow-x: auto;
+}
+.message-content :deep(.code-block code) {
+  background: none; color: #e2e8f0; padding: 0; font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  line-height: 1.6;
+}
 .message-content :deep(blockquote) {
-  border-left: 3px solid #2563eb; padding-left: 10px; color: #64748b; margin: 6px 0; font-size: 13px;
+  border-left: 3px solid #3b82f6; padding: 4px 12px; margin: 8px 0;
+  background: #eff6ff; border-radius: 0 4px 4px 0; color: #475569;
+  font-size: 13px;
 }
-.message-content :deep(p) { margin: 4px 0; }
-.message-content :deep(br) { display: block; margin: 2px 0; content: ""; }
+.message-content :deep(blockquote p) {
+  margin: 2px 0;
+}
+.message-content :deep(a) {
+  color: #2563eb; text-decoration: none; border-bottom: 1px solid transparent;
+  transition: border-color 0.2s;
+}
+.message-content :deep(a:hover) {
+  border-bottom-color: #2563eb;
+}
+.message-content :deep(img) {
+  max-width: 100%; border-radius: 6px; margin: 4px 0;
+}
+.message-content :deep(br) {
+  display: block; content: ""; margin: 2px 0;
+}
 
 .message.error .message-content {
   background: #fef2f2;
