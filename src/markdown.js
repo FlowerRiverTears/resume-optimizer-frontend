@@ -74,29 +74,17 @@ function parseBlocks(text) {
       continue
     }
 
-    if (/^[-*+]\s/.test(line)) {
-      const items = []
-      while (i < lines.length && /^[-*+]\s/.test(lines[i])) {
-        const itemText = lines[i].replace(/^[-*+]\s/, '')
-        if (/^\[[ xX]\]\s/.test(itemText)) {
-          const checked = /^\[[xX]\]/.test(itemText)
-          items.push({ text: itemText.replace(/^\[[ xX]\]\s/, ''), task: true, checked })
-        } else {
-          items.push({ text: itemText, task: false })
-        }
-        i++
-      }
+    if (/^(\s*)[-*+]\s/.test(line)) {
+      const items = parseNestedList(lines, i, /^(\s*)[-*+]\s/, (l) => l.replace(/^\s*[-*+]\s/, ''))
       blocks.push({ type: 'ul', items })
+      i = items._nextIndex || i + 1
       continue
     }
 
-    if (/^\d+\.\s/.test(line)) {
-      const items = []
-      while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
-        items.push(lines[i].replace(/^\d+\.\s/, ''))
-        i++
-      }
+    if (/^(\s*)\d+\.\s/.test(line)) {
+      const items = parseNestedList(lines, i, /^(\s*)\d+\.\s/, (l) => l.replace(/^\s*\d+\.\s/, ''))
       blocks.push({ type: 'ol', items })
+      i = items._nextIndex || i + 1
       continue
     }
 
@@ -111,8 +99,8 @@ function parseBlocks(text) {
       lines[i].trim() !== '' &&
       !/^#{1,6}\s/.test(lines[i]) &&
       !/^\|/.test(lines[i]) &&
-      !/^[-*+]\s/.test(lines[i]) &&
-      !/^\d+\.\s/.test(lines[i]) &&
+      !/^(\s*)[-*+]\s/.test(lines[i]) &&
+      !/^(\s*)\d+\.\s/.test(lines[i]) &&
       !/^>\s?/.test(lines[i]) &&
       !/^(-{3,}|\*{3,}|_{3,})\s*$/.test(lines[i]) &&
       !/^```/.test(lines[i])
@@ -126,6 +114,42 @@ function parseBlocks(text) {
   }
 
   return blocks
+}
+
+function parseNestedList(lines, startIdx, pattern, stripPrefix) {
+  const items = []
+  let i = startIdx
+
+  while (i < lines.length && pattern.test(lines[i])) {
+    const line = lines[i]
+    const indentMatch = line.match(/^(\s*)/)
+    const indent = indentMatch ? indentMatch[1].length : 0
+    const itemText = stripPrefix(line)
+
+    if (/^\[[ xX]\]\s/.test(itemText)) {
+      const checked = /^\[[xX]\]/.test(itemText)
+      items.push({ text: itemText.replace(/^\[[ xX]\]\s/, ''), task: true, checked, indent })
+    } else {
+      let hasChildren = false
+      const childLines = [itemText]
+      let j = i + 1
+      while (j < lines.length && lines[j].trim() !== '' && !pattern.test(lines[j]) && !/^#{1,6}\s/.test(lines[j]) && !/^\|/.test(lines[j]) && !/^>\s?/.test(lines[j]) && !/^```/.test(lines[j]) && !/^(-{3,}|\*{3,}|_{3,})\s*$/.test(lines[j])) {
+        childLines.push(lines[j])
+        hasChildren = true
+        j++
+      }
+      if (hasChildren) {
+        items.push({ text: childLines.join('\n'), task: false, indent })
+        i = j
+        continue
+      }
+      items.push({ text: itemText, task: false, indent })
+    }
+    i++
+  }
+
+  items._nextIndex = i
+  return items
 }
 
 function parseTableAlign(row) {
@@ -164,7 +188,8 @@ function renderCodeBlock(lang, text) {
   const escaped = escapeHtml(text)
   const langAttr = lang ? ` class="language-${lang}"` : ''
   const langLabel = lang ? `<span class="code-lang">${escapeHtml(lang)}</span>` : ''
-  return `<div class="code-block">${langLabel}<pre><code${langAttr}>${escaped}</code></pre></div>`
+  const copyBtn = '<button class="code-copy" onclick="this.closest(\'.code-block\').classList.toggle(\'copied\');const c=this.closest(\'.code-block\').querySelector(\'code\');navigator.clipboard.writeText(c.textContent);this.textContent=\'已复制!\';setTimeout(()=>this.textContent=\'复制\',2000)">复制</button>'
+  return `<div class="code-block">${langLabel}${copyBtn}<pre><code${langAttr}>${escaped}</code></pre></div>`
 }
 
 function renderTable(rows, align) {
@@ -219,7 +244,14 @@ function renderUl(items) {
 function renderOl(items) {
   let html = '<ol>'
   for (const item of items) {
-    html += `<li>${inline(item)}</li>`
+    if (item.task) {
+      const checkbox = item.checked
+        ? '<input type="checkbox" checked disabled>'
+        : '<input type="checkbox" disabled>'
+      html += `<li class="task-item">${checkbox}${inline(item.text)}</li>`
+    } else {
+      html += `<li>${inline(item.text)}</li>`
+    }
   }
   html += '</ol>'
   return html
@@ -235,20 +267,20 @@ function inline(text) {
     return `\x00CODE${codeSpans.length - 1}\x00`
   })
 
-  const links = []
-  r = r.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
-    links.push({ label, url })
-    return `\x00LINK${links.length - 1}\x00`
-  })
-
   const images = []
   r = r.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) => {
     images.push({ alt, src })
     return `\x00IMG${images.length - 1}\x00`
   })
 
+  const links = []
+  r = r.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
+    links.push({ label, url })
+    return `\x00LINK${links.length - 1}\x00`
+  })
+
   r = r.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  r = r.replace(/\*(.+?)\*/g, '<em>$1</em>')
+  r = r.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
   r = r.replace(/~~(.+?)~~/g, '<del>$1</del>')
 
   r = r.replace(/\x00CODE(\d+)\x00/g, (_, idx) => {
