@@ -6,7 +6,7 @@
 
 A Vue 3 powered resume analysis and optimization tool frontend application, designed to work with the [backend service](../resume-optimizer).
 
-## Features
+## ✨ Features
 
 | Feature | Description |
 |---------|-------------|
@@ -14,13 +14,14 @@ A Vue 3 powered resume analysis and optimization tool frontend application, desi
 | 🎯 Skill Matching | Intelligent extraction of skill keywords from resume and job description |
 | 📊 Visual Reports | ECharts radar charts for skill matching, category scores at a glance |
 | 🤖 AI Chat | LLM-based intelligent Q&A and resume generation, with thinking process display |
-| 📚 RAG Retrieval | Hybrid search (vector + keyword) + weighted ranking |
+| 🔍 RAG Retrieval | Hybrid search (vector + keyword) + weighted ranking |
 | 💡 Targeted Suggestions | Personalized optimization suggestions based on missing skills (High/Medium/Low priority) |
 | 📝 Template Comparison | Side-by-side original vs. optimized resume, one-click apply |
 | 🔑 API Key Management | Support 4 AI providers (OpenAI/DashScope/DeepSeek/MiniMax) |
 | 📱 Responsive Design | Adapts to desktop and mobile |
+| 📑 PDF Export | Export analysis reports to PDF format |
 
-## Tech Stack
+## 🛠️ Tech Stack
 
 | Technology | Version | Purpose |
 |------------|---------|---------|
@@ -30,7 +31,11 @@ A Vue 3 powered resume analysis and optimization tool frontend application, desi
 | vue-echarts | 7.0.0 | Vue ECharts integration |
 | Custom Markdown Parser | - | AI response rendering (no third-party dependencies, XSS protection) |
 
-## Quick Start
+## 🚀 Quick Start
+
+### Requirements
+
+- Node.js 20.19+ or 22.12+
 
 ### Install Dependencies
 
@@ -58,7 +63,7 @@ npm run build
 npm run preview
 ```
 
-## Backend Integration
+## 🔗 Backend Integration
 
 This frontend requires the Resume Optimizer backend service:
 
@@ -70,7 +75,7 @@ cd resume-optimizer
 
 Ensure the backend runs at `http://localhost:9000` (Vite proxy is configured in `vite.config.js`)
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 src/
@@ -88,7 +93,7 @@ src/
     └── TemplateComparison.vue # Template comparison (side-by-side / skill highlighting / apply template)
 ```
 
-## Component Overview
+## 🧩 Component Overview
 
 | Component | Function |
 |-----------|----------|
@@ -100,17 +105,49 @@ src/
 | ApiKeyInput | API Key management (4 providers / advanced settings / collapsible panel) |
 | TemplateComparison | Template comparison (side-by-side / skill highlighting / apply template) |
 
-## Privacy Statement
+## 🎨 Custom Markdown Parser
+
+This project uses a custom Markdown parser with the following features:
+
+- ✅ No third-party dependencies
+- ✅ Full Markdown syntax support (headings/tables/code blocks/lists/blockquotes/etc.)
+- ✅ Built-in XSS protection
+- ✅ Code block copy button
+- ✅ Responsive table scrolling
+
+## 🔒 Privacy Statement
 
 - 🔒 **Local Processing** - All resume data is processed locally through the backend, not uploaded to third parties
 - 🚫 **No Persistence** - API Keys are stored in memory only, cleared on restart
 - 💾 **Secure Rendering** - Custom Markdown parser with built-in XSS protection
 
-## Related Documentation
+## 🤝 Contributing
 
-| Document | Description |
-|----------|-------------|
-| [Backend README](../resume-optimizer/README.en.md) | Backend project documentation |
-| [Architecture](../resume-optimizer/docs/ARCHITECTURE.md) | System architecture design |
-| [Frontend Specs](../resume-optimizer/docs/FRONTEND.md) | Frontend development specifications |
-| [Security](../resume-optimizer/docs/SECURITY.md) | Security specifications |
+Issues and Pull Requests are welcome!
+
+### Development Flow
+
+1. Fork this repository
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'feat: add some feature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Submit a Pull Request
+
+## 📝 Changelog
+
+### v1.0.0 (2026-05-01)
+
+- ✨ Initial release
+- ✅ 7 Vue components
+- ✅ ECharts radar chart and bar chart
+- ✅ Custom Markdown parser
+- ✅ PDF export functionality
+- ✅ Responsive design
+
+## 📄 License
+
+This project is for learning and research purposes only.
+
+---
+
+**Star** ⭐ this project for latest updates!

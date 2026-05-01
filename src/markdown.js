@@ -192,11 +192,30 @@ function renderCodeBlock(lang, text) {
   return `<div class="code-block">${langLabel}${copyBtn}<pre><code${langAttr}>${escaped}</code></pre></div>`
 }
 
+function getColumnWidths(colCount) {
+  if (colCount === 2) return ['35%', '65%']
+  if (colCount === 3) return ['25%', '45%', '30%']
+  if (colCount === 4) return ['20%', '30%', '25%', '25%']
+  const w = Math.floor(100 / colCount)
+  return Array(colCount).fill(w + '%')
+}
+
 function renderTable(rows, align) {
   if (rows.length === 0) return ''
 
   const headerCells = splitCells(rows[0])
-  let html = '<div class="table-wrapper"><table><thead><tr>'
+  const colCount = headerCells.length
+  const widths = getColumnWidths(colCount)
+
+  let html = '<div class="table-wrapper"><table style="table-layout:fixed">'
+
+  html += '<colgroup>'
+  widths.forEach(w => {
+    html += `<col style="width:${w}">`
+  })
+  html += '</colgroup>'
+
+  html += '<thead><tr>'
   headerCells.forEach((cell, idx) => {
     const a = align && align[idx] ? ` style="text-align:${align[idx]}"` : ''
     html += `<th${a}>${inline(cell)}</th>`

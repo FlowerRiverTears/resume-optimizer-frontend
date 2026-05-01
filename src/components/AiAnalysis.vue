@@ -387,16 +387,31 @@ onMounted(() => {
 }
 .result-content :deep(table) {
   width: 100%; border-collapse: collapse; font-size: 13px;
-  min-width: 400px;
+  table-layout: fixed;
+}
+.result-content :deep(colgroup) {
+  display: table-column-group;
 }
 .result-content :deep(th) {
   background: #f1f5f9; font-weight: 600; text-align: left;
   border-bottom: 2px solid #cbd5e1; padding: 7px 12px;
-  color: #334155; white-space: nowrap;
+  color: #334155; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .result-content :deep(td) {
   border-bottom: 1px solid #f1f5f9; padding: 6px 12px;
-  color: #475569;
+  color: #475569; overflow: hidden; text-overflow: ellipsis;
+  word-break: break-word;
+}
+.result-content :deep(td:first-child) {
+  white-space: nowrap;
+}
+.result-content :deep(td:last-child) {
+  white-space: nowrap;
+}
+.result-content :deep(td:nth-child(2)) {
+  overflow: visible; text-overflow: clip;
+  word-break: break-word; white-space: normal;
 }
 .result-content :deep(tr:hover td) {
   background: #f8fafc;

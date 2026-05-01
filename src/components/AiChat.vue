@@ -423,16 +423,31 @@ onMounted(() => {
 }
 .message-content :deep(table) {
   width: 100%; border-collapse: collapse; font-size: 12px;
-  min-width: 400px;
+  table-layout: fixed;
+}
+.message-content :deep(colgroup) {
+  display: table-column-group;
 }
 .message-content :deep(th) {
   background: #f1f5f9; font-weight: 600; text-align: left;
   border-bottom: 2px solid #cbd5e1; padding: 6px 10px;
-  color: #334155; white-space: nowrap;
+  color: #334155; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .message-content :deep(td) {
   border-bottom: 1px solid #f1f5f9; padding: 5px 10px;
-  color: #475569;
+  color: #475569; overflow: hidden; text-overflow: ellipsis;
+  word-break: break-word;
+}
+.message-content :deep(td:first-child) {
+  white-space: nowrap;
+}
+.message-content :deep(td:last-child) {
+  white-space: nowrap;
+}
+.message-content :deep(td:nth-child(2)) {
+  overflow: visible; text-overflow: clip;
+  word-break: break-word; white-space: normal;
 }
 .message-content :deep(tr:hover td) {
   background: #f8fafc;
